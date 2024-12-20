@@ -21,6 +21,16 @@
     a:hover {
       text-decoration: underline;
     }
+    header {
+      background-color: #161b22; /* Etwas dunkler als der Haupt-Hintergrund */
+      padding: 1rem;
+      text-align: center;
+      border-bottom: 1px solid #30363d;
+    } -->
+    header h1 {
+      margin: 0;
+      color: #c9d1d9; /* Helle Schrift für den Header */
+    }
     main {
       max-width: 800px;
       margin: 2rem auto;
@@ -30,7 +40,7 @@
 </head>
 <body>
   <header>
-    <h1>{{ site.title | default: "Mein Blog" }}</h1>
+    <!--<h1>{{ site.title | default: "Mein Blog" }}</h1> -->
   </header>
   <main>
     {{ content }}
