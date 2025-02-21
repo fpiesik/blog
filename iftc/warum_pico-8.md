@@ -1,3 +1,10 @@
+---
+title: Meine Startseite
+layout: default
+---
+
+# Dein Blog
+
 - **Reduktion** auf das Wesentliche
 - **Schnittstelle** zur echten Welt (Community, Discord, Indieszene)
     - Es ist kein Tool, was für die Bildung gemacht wurde und dementsprechend in der Bildungsdomäne isoliert ist, sondern es findet vor allem in der echten Szene statt.
