@@ -1,5 +1,4 @@
 ---
-title: Meine Startseite
 layout: default
 ---
 
