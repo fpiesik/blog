@@ -3,7 +3,7 @@ title: Meine Startseite
 layout: default
 ---
 
-# Mein Blog
+# Dein Blog
 
 Willkommen! Hier findest du eine Übersicht meiner Blogartikel und Projekte.
 
