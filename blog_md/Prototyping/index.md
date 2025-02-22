@@ -8,7 +8,7 @@ Der Generator basiert auf Nema 17 Steppermotoren, weil sie einerseits recht gün
 
 Der Generator ist recht modular aufgebaut. Das gilt einerseits für die Konstruktion, die mit der CAD-Programmiersprache openSCAD erstellt wurde. Zum Anderen kan man dien Generator skalieren, indem man die Anzahl der Nema 17 Motoren variiert. Es können bis zu 8 Motoren verbaut werden.
 
-[1-Gitarre_Track 62.mp3](../_resources/1-Gitarre_Track%2062.mp3)
+[1-Gitarre_Track 62.mp3](./resources/1-Gitarre_Track.mp3)
 
 Bei der ersten Version des Generators verwendete ich eine M8-Gewindestange als Achse und Skateboeardkugellager, umden Materialbedarf möglichst einfach zu halten. Das hatte zu mehren Problemen geführt. Zum einen war es ziemlich schwierig, die Kurbeln genau 180 zueinander auszurichten. Zum anderen reichten die 8mm nicht für eine stabile Achse.
 
@@ -20,7 +20,7 @@ Eine 12mm Achse wäre vermutlich stabil genug gewesen, allerdings hätte ich dan
 
 Ich habe wenig Vergleichsmöglichkeiten, weswegen es mir etwas schwer fällt, die Leistungsausbeute einzuordnen. Mit vier Steppermotoren erreiche ich bei langsamen Treten ca 10 und bei schnellerem 20 Watt. Mit den Händen komme ich bei vollem Einsatz maximal 30 Watt heraus. Meinetwegen dürfte es gerne etwas mehr sehr sein, aber mein Ziel, meinen Laptop währen der Nutzug durch Pedalieren mit ausreichend Strom zu versorgen, habe ich immerhin erreicht, sofern ich damit nicht Zocken möchte. Es wäre interessant zu wissen, wie viel Strom ich mit einem komplett eigenen Generator-Design, also mit selbstgewickelten Spulen und Magneten, erzeugen könnte. Eine Andere Stellschraube wäre es, mehr als vier Steppermotoren einzusetzen. Das allerdings würde den ohnehin schon großen Schaltungsaufwand
 
-<img src="../_resources/PXL_20240428_153655113.PORTRAIT.jpg" alt="PXL_20240428_153655113.PORTRAIT.jpg" width="617" height="819">
+<img src="./resources/PXL_20240428_153655113.PORTRAIT.jpg" alt="PXL_20240428_153655113.PORTRAIT.jpg" width="617" height="819">
 
 ## Elektronik
 
