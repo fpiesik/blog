@@ -8,7 +8,7 @@ layout: default
 Willkommen! Hier findest du eine Übersicht meiner Blogartikel und Projekte.
 
 ## Musik
-- [Artikel 1: ](https://github.com/username/repository1/tree/main/docs/artikel1.md)
+- [Artikel 1: ](https://fpiesik.github.io/blog/blog_md/Prototyping/)
 - [Artikel 2: Thema ABC](https://github.com/username/repository2/tree/main/docs/artikel2.md)
 
 ## Energie
