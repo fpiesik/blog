@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 Wenn es windstill ist und die Sonne nicht scheint, ist Muskelkraft gefragt, sofern man seinen Strom selbst erzeugen und nichts anzünden möchte (oder habe ich etwas vergessen?). Ich habe diesen Generator aus Neugier gebaut, aber auch weil ich die Idee mag, meinen Laptop während der Nutzung durch Padalieren aufzuladen - also Nerdyness mit Fittnes zu verbinden.
 
 Der Generator basiert auf Nema 17 Steppermotoren, weil sie einerseits recht günstig sind, und zum Anderen gelten sie, [verglichen](https://youtu.be/cJ_vDA7xsGs?si=5OKRyAfqR_R4vbK4) mit anderen potenziellen Kandidaten als recht effizient.
