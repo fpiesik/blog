@@ -3,7 +3,7 @@ title: Meine Startseite
 layout: default
 ---
 
-06.03.2025: [Ganztagsschule: Mehr vom Gleichen? ([eng](https://fpiesik.github.io/blog/Full-Day_Schooling:_More_of_the_Same)](https://fpiesik.github.io/blog/Ganztagsschule:_Mehr_vom_Gleichen.htm)
+06.03.2025: [Ganztagsschule: Mehr vom Gleichen? ([eng](https://fpiesik.github.io/blog/Full-Day_Schooling:_More_of_the_Same.htm)](https://fpiesik.github.io/blog/Ganztagsschule:_Mehr_vom_Gleichen.htm)
 
 
 
