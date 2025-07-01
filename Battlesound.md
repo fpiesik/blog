@@ -1,3 +1,10 @@
+---
+title: Battlesound
+layout: default
+include:
+  - "_resources"
+---
+
 Battlesound ist ein Pico-8 Spiel, dass ich in erster Linie für meinen Musikunterricht entwickelt habe. Die Idee ist an das Spiel "Schiffe Versenken" ("Battleship") angelehnt, wo es darum geht, auf einem Raster Schiffe zu finden und zu versenken. In Battlesound geht es also darum, Töne auf einem Raster zu finden, die man nicht sehen, sondern nur hören kann.
 
 Es geht also darum, das Gehör zu trainieren. Es gibt bereits viele Tools, die dieses Ziel verfolgen. Allerdings ging es mir bei der Umsetzung darum,
