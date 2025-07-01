@@ -17,4 +17,4 @@ Es geht also darum, das Gehör zu trainieren. Es gibt bereits viele Tools, die d
 
 &nbsp;
 
-![battlesound_0.png](./_resources/battlesound_0.png)
+![battlesound_0.png](./resources/battlesound_0.png)
