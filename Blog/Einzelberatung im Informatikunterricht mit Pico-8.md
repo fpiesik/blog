@@ -1,3 +1,9 @@
+---
+title: Battlesound  
+layout: default
+
+---
+
 Einzelberatung im Informatikunterricht mit Pico-8
 
 Im Informatikunterricht einer Oberschule, im Rahmen des von mir angebotenen Profils „Spieleentwicklung“, habe ich gute Erfahrungen mit einer Methode zur individuellen Unterstützung der Schüler gesammelt. Wir programmieren ein Stein-Schere-Papier-Spiel in der Entwicklungsumgebung [Pico-8](https://www.lexaloffle.com/pico-8.php). Dabei senden mir die Spieleentwickler ihre jeweils aktuelle Programmversion mithilfe der „save @clip“-Funktion, durch die ganze Spiele in Textform in der Zwischenablage gespeichert werden können, direkt per Nachricht über die Lernplattform itsLearning zu. So kann ich die Spiele unmittelbar in meine Pico-8-Oberfläche laden, um dann gemeinsam mit ihnen an meinem Lehrerpult ihre konkreten Programmierprobleme zu lösen. Mein Bildschirm wird währenddessen über den Beamer für die gesamte Klasse sichtbar gemacht, sodass jeder die Möglichkeit hat, dem Gespräch spontan zu folgen. Anschließend sende ich die gemeinsam überarbeitete Version auf dem gleichen Weg zurück, sodass die Schüler direkt daran weiterarbeiten können. Die Reihenfolge der Beratungsgespräche ergibt sich in der Regel automatisch aus der zeitlichen Abfolge, in der die Nachrichten bei mir eintreffen.

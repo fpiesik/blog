@@ -1,3 +1,9 @@
+---
+title: Battlesound  
+layout: default
+
+---
+
 Ganztagsschule: Mehr vom Gleichen?
 
 In unserer letzten Dienstbesprechung haben wir darüber diskutiert, ob wir unser Profilangebot – also die Möglichkeit für Lehrkräfte, ohne curricularen Druck Themen anzubieten, die stärker auf die Interessen der Schülerinnen und Schüler eingehen – weiterhin aufrechterhalten sollten. Einige Stimmen plädierten dafür, stattdessen mehr Zeit für die Hauptfächer Mathematik, Deutsch und Englisch zu verwenden, um die zweifelsohne großen Defizite in den Grundlagen vieler Schülerinnen und Schüler zu adressieren. Diese Diskussion hat mich sehr beschäftigt, weil sie grundsätzliche Fragen darüber aufwirft, was Schule leisten soll und wie wir unsere Schülerinnen und Schüler am besten auf die Zukunft vorbereiten.
