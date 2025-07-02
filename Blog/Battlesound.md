@@ -24,5 +24,3 @@ Es geht also darum, das Gehör zu trainieren. Es gibt bereits viele Tools, die d
 &nbsp;
 
 [639893main_Good_Picture_of_Steve.mp3](../_resources/639893main_Good_Picture_of_Steve.mp3)
-
-[C0113.MP4](../_resources/C0113.MP4)
