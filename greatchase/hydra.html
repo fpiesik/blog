@@ -126,7 +126,8 @@
       .brightness(()=> P.img_col.v*iC());
 
     // Videoquelle
-    let cam = src(s1)
+    s2.initVideo("https://fpiesik.github.io/blog/greatchase/greatchasem8.mkv");
+    let cam = src(s2)
       .scale(()=> 1.0+vS())
       .scrollX(()=> time*P.vid_mov.dir[0]*vM())
       .scrollY(()=> time*P.vid_mov.dir[1]*vM())
