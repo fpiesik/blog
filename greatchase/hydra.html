@@ -1,0 +1,301 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Hydra + OBS + MIDI – Chase Playground</title>
+  <style>
+    html,body{margin:0;background:#000}
+    canvas{width:100vw;height:100vh;display:block}
+    #obsCam{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px}
+  </style>
+  <!-- <script src="https://unpkg.com/hydra-synth"></script> -->
+  <script src="./hydra-synth.js"></script>
+</head>
+<body>
+
+  <!-- persistentes, verstecktes Videoelement -->
+  <video id="obsCam" muted playsinline></video>
+
+<script type="module">
+  // -------- Hydra init --------
+  const hydra = new Hydra({ detectAudio:true, makeGlobal:true });
+  a.setBins(8);
+
+  // -------- Kamera auswählen (per Label-Substring) --------
+  const camLabel = "OBS"; // z.B. "OBS", "Logitech", "USB"
+  const vidEl = document.getElementById('obsCam');
+  let currentStream = null;
+
+  async function ensureMediaPermission() {
+    try { await navigator.mediaDevices.getUserMedia({ video:true }); } catch {}
+  }
+  async function listCams() {
+    await ensureMediaPermission();
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    return devs.filter(d => d.kind === 'videoinput');
+  }
+  async function setCamera(labelSubstr) {
+    const cams = await listCams();
+    const cam = cams.find(c => c.label.includes(labelSubstr)) || cams[0];
+    if (!cam) throw new Error("Keine Kamera gefunden!");
+    if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: cam.deviceId } }, audio:false
+    });
+    currentStream = stream;
+    vidEl.srcObject = stream;
+    try { await vidEl.play(); } catch(e){ console.warn("play() warn:", e); }
+    if (!setCamera._init) {
+      s1.init({ src: vidEl, dynamic:true });
+      setCamera._init = true;
+    }
+  }
+  await setCamera(camLabel);
+
+  // -------- Envelopes --------
+  function makeEnv(idx, att, rel){
+    let y=0, tPrev=0;
+    return ()=> {
+      const x=a.fft[idx]||0, t=time||0, dt=Math.max(0.0005, t - tPrev);
+      const aUp=1-Math.exp(-dt/att), aDown=1-Math.exp(-dt/rel);
+      y += ((x>y)?aUp:aDown) * (x - y);
+      tPrev=t; return y;
+    }
+  }
+  const env = (src,fac,att,rel)=>{ const e=makeEnv(src,att,rel); return ()=> e()*fac; };
+
+  // -------- Parameter --------
+  const P = {
+    // Videoquelle (s1 / Tracker)
+    vid_speed:0.0,
+    vid_scl:{src:0,fac:0.15,att:0.03,rel:0.25},
+    vid_mov:{src:0,fac:0.00,att:0.02,rel:0.20,dir:[1,0]},
+    vid_col:{src:6,fac:0.20,att:0.03,rel:0.25,h:0.2,s:0.3,v:0.3},
+    vid_warp:0.25, vid_wspd:0.12,
+
+    // Bildquelle (s0 / Szene)
+    img_speed:0.0,
+    img_scl:{src:0,fac:0.00,att:0.03,rel:0.25,abs:1},
+    img_mov:{src:0,fac:0.06,att:0.03,rel:0.25,dir:[1,0]},
+    img_col:{src:6,fac:0.12,att:0.03,rel:0.25,h:0.15,s:0.3,v:0.3},
+    img_warp:0.22, img_wspd:0.12,
+
+    // Sirene (weicher Gradient)
+    siren:0.35, sir_spd:0.20, sir_w:0.35, sir_dir:'x',
+    sirA:[1.0,0.05,0.05], sirB:[0.05,0.2,1.0],
+
+    // Mix
+    blend:0.6, trail:0.22
+  };
+
+  // -------- Sirene (weicher, zyklischer Gradient) --------
+  function SirenSoft(){
+    const freq = ()=> Math.max(0.05, 1.0/Math.max(0.05,P.sir_w));
+    const spd  = ()=> P.sir_spd;
+    let G = osc(freq, spd, 0).saturate(0);
+    if (P.sir_dir==='y') G = G.rotate(Math.PI/2);
+    const oneMinusG = solid(1,1,1).diff(G);
+    const A = solid(P.sirA[0],P.sirA[1],P.sirA[2]).mult(oneMinusG);
+    const B = solid(P.sirB[0],P.sirB[1],P.sirB[2]).mult(G);
+    return A.add(B).brightness(0.06);
+  }
+
+  // -------- Build graph --------
+  function build(){
+    const vS = env(P.vid_scl.src,P.vid_scl.fac,P.vid_scl.att,P.vid_scl.rel);
+    const vM = env(P.vid_mov.src,P.vid_mov.fac,P.vid_mov.att,P.vid_mov.rel);
+    const vC = env(P.vid_col.src,P.vid_col.fac,P.vid_col.att,P.vid_col.rel);
+
+    const iS = env(P.img_scl.src,P.img_scl.fac,P.img_scl.att,P.img_scl.rel);
+    const iM = env(P.img_mov.src,P.img_mov.fac,P.img_mov.att,P.img_mov.rel);
+    const iC = env(P.img_col.src,P.img_col.fac,P.img_col.att,P.img_col.rel);
+
+    const noiseV = ()=> noise(3,P.vid_wspd);
+    const noiseI = ()=> noise(3,P.img_wspd);
+
+    // Bildquelle
+    s0.initImage("https://fpiesik.github.io/blog/greatchase/chase_01.png");
+    //s0.initImage("https://fpiesik.github.io/blog/Blog/sunrise.jpg");
+    let img = src(s0).scale(1.5,0.7)
+      .scrollX(()=> time*P.img_speed + time*P.img_mov.dir[0]*iM())
+      .scrollY(()=> time*P.img_mov.dir[1]*iM())
+      .scale(()=> P.img_scl.abs+iS())
+      .modulate(noiseI(), ()=> P.img_warp*0.05)
+      .hue(()=> P.img_col.h*iC())
+      .saturate(()=> 1+P.img_col.s*iC())
+      .brightness(()=> P.img_col.v*iC());
+
+    // Videoquelle
+    let cam = src(s1)
+      .scale(()=> 1.0+vS())
+      .scrollX(()=> time*P.vid_mov.dir[0]*vM())
+      .scrollY(()=> time*P.vid_mov.dir[1]*vM())
+      .modulate(noiseV(), ()=> P.vid_warp*0.05)
+      .hue(()=> P.vid_col.h*vC())
+      .saturate(()=> 1+P.vid_col.s*vC())
+      .brightness(()=> P.vid_col.v*vC());
+
+    let L = img.blend(cam, P.blend, 1);
+    if (P.siren>0) L = L.add(SirenSoft(), ()=> P.siren);
+
+    L.out(o0);
+    src(o0).blend(L, ()=> 1-P.trail).out(o1);
+    render(o1);
+  }
+  build();
+
+  // ===== MIDI: ALLE Parameter per CC steuerbar =====
+  function scale(x, inMin, inMax, outMin, outMax){
+    const t = Math.max(inMin, Math.min(inMax, x));
+    const n = (t - inMin) / (inMax - inMin);
+    return outMin + n * (outMax - outMin);
+  }
+  function setByPath(obj, path, val){
+    const parts = path.split('.');
+    const last = parts.pop();
+    let ref = obj;
+    for(const p of parts){
+      if (/^\d+$/.test(p)) { ref = ref[+p]; } else { ref = ref[p]; }
+    }
+    ref[last] = val;
+  }
+
+  // CC → Parameterpfad + Typ/Range
+  const CC_MAP = {
+    // Mix/Global
+    4:  { path:'blend',   type:'lin', range:[0,1] },
+    7:  { path:'trail',   type:'lin', range:[0,0.9] },
+
+    // Sirene
+    1:  { path:'siren',   type:'lin', range:[0,1] },
+    2:  { path:'sir_spd', type:'lin', range:[0,1] },
+    3:  { path:'sir_w',   type:'lin', range:[0.05,0.9] },
+    20: { path:'sir_dir', type:'toggle', A:'x', B:'y' },
+    21: { path:'sirA.0',  type:'lin', range:[0,1] },
+    22: { path:'sirA.1',  type:'lin', range:[0,1] },
+    23: { path:'sirA.2',  type:'lin', range:[0,1] },
+    24: { path:'sirB.0',  type:'lin', range:[0,1] },
+    25: { path:'sirB.1',  type:'lin', range:[0,1] },
+    26: { path:'sirB.2',  type:'lin', range:[0,1] },
+
+    // VIDEOQUELLE
+    27: { path:'vid_speed',   type:'lin', range:[-0.2,0.2] },
+    30: { path:'vid_scl.src', type:'int', range:[0,7] },
+    31: { path:'vid_scl.fac', type:'lin', range:[0,0.6] },
+    32: { path:'vid_scl.att', type:'lin', range:[0.005,0.2] },
+    33: { path:'vid_scl.rel', type:'lin', range:[0.05,1.0] },
+
+    34: { path:'vid_mov.src', type:'int', range:[0,7] },
+    35: { path:'vid_mov.fac', type:'lin', range:[0,0.3] },
+    36: { path:'vid_mov.att', type:'lin', range:[0.005,0.2] },
+    37: { path:'vid_mov.rel', type:'lin', range:[0.05,1.0] },
+    38: { path:'vid_mov.dir.0', type:'lin', range:[-1,1] },
+    39: { path:'vid_mov.dir.1', type:'lin', range:[-1,1] },
+
+    40: { path:'vid_col.src', type:'int', range:[0,7] },
+    41: { path:'vid_col.fac', type:'lin', range:[0,1.0] },
+    42: { path:'vid_col.att', type:'lin', range:[0.005,0.2] },
+    43: { path:'vid_col.rel', type:'lin', range:[0.05,1.0] },
+    44: { path:'vid_col.h',   type:'lin', range:[-0.5,0.5] },
+    45: { path:'vid_col.s',   type:'lin', range:[0,1.0] },
+    46: { path:'vid_col.v',   type:'lin', range:[0,1.0] },
+
+    47: { path:'vid_warp',    type:'lin', range:[0,1.0] },
+    48: { path:'vid_wspd',    type:'lin', range:[0.01,1.0] },
+
+    // BILDQUELLE
+    50: { path:'img_speed',   type:'bip', range:[-0.2,0.2],dead: 1 },
+    51: { path:'img_scl.src', type:'int', range:[0,7] },
+    52: { path:'img_scl.fac', type:'lin', range:[0,1] },
+    53: { path:'img_scl.att', type:'lin', range:[0.005,0.2] },
+    54: { path:'img_scl.rel', type:'lin', range:[0.05,1.0] },
+    70: { path:'img_scl.abs', type:'lin', range:[0.05,2.0] },
+
+    55: { path:'img_mov.src', type:'int', range:[0,7] },
+    56: { path:'img_mov.fac', type:'lin', range:[0,0.1] },
+    57: { path:'img_mov.att', type:'lin', range:[0.005,0.2] },
+    58: { path:'img_mov.rel', type:'lin', range:[0.05,1.0] },
+    59: { path:'img_mov.dir.0', type:'lin', range:[-1,1] },
+    60: { path:'img_mov.dir.1', type:'lin', range:[-1,1] },
+
+    61: { path:'img_col.src', type:'int', range:[0,7] },
+    62: { path:'img_col.fac', type:'lin', range:[0,1.0] },
+    63: { path:'img_col.att', type:'lin', range:[0.005,0.2] },
+    64: { path:'img_col.rel', type:'lin', range:[0.05,1.0] },
+    65: { path:'img_col.h',   type:'lin', range:[-0.5,0.5] },
+    66: { path:'img_col.s',   type:'lin', range:[0,1.0] },
+    67: { path:'img_col.v',   type:'lin', range:[0,1.0] },
+
+    68: { path:'img_warp',    type:'lin', range:[0,1.0] },
+    69: { path:'img_wspd',    type:'lin', range:[0.01,1.0] }
+  };
+
+  // --- helpers for MIDI mapping ---
+  function mapLinear(d2, [outMin, outMax]) {
+    const t = d2 / 127;                    // 0..1
+    return outMin + t * (outMax - outMin);
+  }
+
+  // Bipolar mit Deadzone um die Mitte (center=63.5), dead in CC-Steps (z.B. 2)
+  function mapBipolar(d2, [negMin, posMax], dead = 2) {
+    const center = 63.5;
+    // in Deadzone: exakt Null
+    if (Math.abs(d2 - center) <= dead) return 0;
+
+    if (d2 > center) {
+      const lo = center + dead;
+      const t = (d2 - lo) / (127 - lo);    // 0..1 nach oben
+      return t * posMax;
+    } else {
+      const hi = center - dead;
+      const t = (d2 - hi) / (0 - hi);      // 0..1 nach unten
+      return t * negMin;                   // negMin ist negativ (z.B. -0.2)
+    }
+  }
+
+  function mapInt(d2, [minI, maxI]) {
+    const t = d2 / 127;
+    return Math.round(minI + t * (maxI - minI));
+  }
+
+  async function initMIDI_AllParams(){
+    if (!('requestMIDIAccess' in navigator)) {
+      console.warn('WebMIDI nicht verfügbar');
+      return;
+    }
+    const midi = await navigator.requestMIDIAccess();
+    console.log(`MIDI Inputs: ${midi.inputs.size}`);
+    midi.inputs.forEach(input=>{
+      input.onmidimessage = (msg)=>{
+        const [st, d1, d2] = msg.data;
+        if ((st & 0xF0) !== 0xB0) return; // nur CC
+        const map = CC_MAP[d1];
+        if (!map) return;
+
+        // im onmidimessage-Handler:
+        let newVal;
+        if (map.type === 'toggle') {
+          newVal = (d2 < 64) ? map.A : map.B;
+        } else if (map.type === 'int') {
+          newVal = mapInt(d2, map.range);
+        } else if (map.type === 'bip') {
+          newVal = mapBipolar(d2, map.range, map.dead ?? 2);
+        } else { // 'lin' default
+          newVal = mapLinear(d2, map.range);
+        }
+
+        setByPath(P, map.path, newVal);
+        build();
+      };
+    });
+
+    // Übersicht im Console-Table
+    console.table(
+      Object.entries(CC_MAP).map(([cc,cfg])=>({CC:+cc, Param:cfg.path, Type:cfg.type, Range:cfg.range||''}))
+    );
+  }
+  await initMIDI_AllParams();
+
+</script>
+</body>
+</html>
