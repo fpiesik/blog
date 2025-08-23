@@ -116,7 +116,7 @@
     // Bildquelle
     s0.initImage("https://fpiesik.github.io/blog/greatchase/chase02.png");
     //s0.initImage("https://fpiesik.github.io/blog/Blog/sunrise.jpg");
-    let img = src(s0).scale(1.5,0.7)
+    let img = src(s0).scale(1,1)
       .scrollX(()=> time*P.img_speed + time*P.img_mov.dir[0]*iM())
       .scrollY(()=> time*P.img_mov.dir[1]*iM())
       .scale(()=> P.img_scl.abs+iS())
