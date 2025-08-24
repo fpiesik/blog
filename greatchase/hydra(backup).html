@@ -54,32 +54,26 @@
 
   // -------- Parameter --------
   const P = {
-    // Bildquelle (s0 / Szene)
-    img_speed:0.0,
-    img_scl:{src:0,fac:0.0,att:0.1,rel:0.25,abs:0},
-    img_mov:{src:0,fac:0.0,att:0.1,rel:0.25,dir:[1,0]},
-    img_col:{src:6,fac:0.0,att:0.1,rel:0.25,h:0.3,s:0.3,v:0.3,ho:0,so:0,vo:0},
-    img_warp:0.0, img_wspd:0.1,
-
     // Videoquelle (s1 / Tracker)
     vid_speed:0.0,
-    vid_scl:{src:0,fac:0.0,att:0.1,rel:0.25,abs:0},
+    vid_scl:{src:0,fac:0.0,att:0.1,rel:0.25,abs:1},
     vid_mov:{src:0,fac:0.0,att:0.1,rel:0.25,dir:[1,0]},
     vid_col:{src:6,fac:0.0,att:0.1,rel:0.25,h:0.3,s:0.3,v:0.3,ho:0,so:1,vo:0},
     vid_warp:0.0, vid_wspd:0.1,
+
+    // Bildquelle (s0 / Szene)
+    img_speed:0.0,
+    img_scl:{src:0,fac:0.0,att:0.1,rel:0.25,abs:1},
+    img_mov:{src:0,fac:0.0,att:0.1,rel:0.25,dir:[1,0]},
+    img_col:{src:6,fac:0.0,att:0.1,rel:0.25,h:0.3,s:0.3,v:0.3,ho:0,so:1,vo:0},
+    img_warp:0.0, img_wspd:0.1,
 
     // Sirene (weicher Gradient)
     siren:0.0, sir_spd:0.20, sir_w:0.35, sir_dir:'x',
     sirA:[1.0,0.05,0.05], sirB:[0.05,0.2,1.0],
 
     // Mix
-    blend:1, trail:0.22,
-
-    // Keying (Video: Schwarz = transparent) //To Do
-    // key_on: 0,              // 0 = normales Crossfade, 1 = Key aktiv
-    // key_thr: 0.05,          // Luma-Threshold
-    // key_soft: 0.04,         // Kantenweichheit
-    // key_mode: 'alpha'         // 'add' oder 'alpha'
+    blend:0.6, trail:0.22
   };
 
   // -------- Dynamische Envelopes (lesen P live, kein Rebuild nötig) --------
@@ -125,13 +119,13 @@
   const noiseV = () => noise(3, () => P.vid_wspd);
 
   // -------- Quellen EINMAL initialisieren --------
-  s0.initImage("./chase1920x1080.png"); // lokal
+  s0.initImage("./chase1920x1080.png"); // lokal (wie bei dir)
 
   // -------- Node-Graph EINMAL definieren --------
   const imgNode = () => src(s0).scale(1,1)
     .scrollX(() => time*P.img_speed + time*P.img_mov.dir[0]*iM())
     .scrollY(() => time*P.img_mov.dir[1]*iM())
-    .scale(() => P.img_scl.abs + 1 + iS())
+    .scale(() => P.img_scl.abs + iS())
     .modulate(noiseI(), () => P.img_warp * 0.05)
     .hue(() => P.img_col.ho + P.img_col.h * iC())
     .saturate(() => P.img_col.so + P.img_col.s * iC())
@@ -140,49 +134,23 @@
   const camNode = () => src(s1)
     .scrollX(() => time*P.vid_mov.dir[0]*vM() + time*P.vid_speed)
     .scrollY(() => time*P.vid_mov.dir[1]*vM())
-    .scale(() => P.vid_scl.abs + 1 + vS())
+    .scale(() => P.vid_scl.abs + vS())
     .modulate(noiseV(), () => P.vid_warp * 0.05)
     .hue(() => P.vid_col.ho + P.vid_col.h * vC())
     .saturate(() => P.vid_col.so + P.vid_col.s * vC())
     .brightness(() => P.vid_col.vo + P.vid_col.v * vC());
 
-  // ---- Keying auf das bereits bearbeitete Video anwenden ----
-  //const camLuma = () => camNode().saturate(0).thresh(() => P.key_thr, () => P.key_soft);
-  //const camKeyed = () => camNode().mask(camLuma());
-
   // Erstes Frame „schwarz“ in o0, damit Feedback sauber startet
   solid(0,0,0,1).out(o0);
 
-  // -------- Komposition --------
-  // 1) Normales Crossfade (wenn key_on = 0)
-  // 2) Keyed Video darüber (Add oder Alpha), wenn key_on = 1
-  const comp =
-    imgNode()
-      // Normal-Blend aktiv im Verhältnis blend * (1 - key_on)
-      //.blend(camNode(), () => P.blend * (1 - P.key_on))
-      .add(camNode(), () => P.blend)
-      // Key-Zweig: Add ODER Alpha – gewichtet mit blend * key_on
-      // .add( // ADD-Modus-Anteil
-      //  camKeyed(),
-      //  () => P.key_mode === 'add' ? P.blend * P.key_on : 0
-      // )
-      // .layer( // ALPHA-Modus-Anteil (Deckkraft via mult)
-      //   camKeyed().mult(
-      //     solid(
-      //       () => P.key_mode === 'alpha' ? P.blend * P.key_on : 0,
-      //       () => P.key_mode === 'alpha' ? P.blend * P.key_on : 0,
-      //       () => P.key_mode === 'alpha' ? P.blend * P.key_on : 0
-      //     )
-      //   )
-      // )
+  // Finales Patch (Texture-Args direkt, numerische als Funktionen)
+  imgNode()
+    .blend(camNode(), () => P.blend, 1)
+    .add(sirenTex(), () => P.siren)
+    // Feedback: mische mit vorigem Frame (o0) je nach trail
+    .blend(src(o0), () => P.trail)
+    .out(o0);
 
-      // Sirene
-      .add(sirenTex(), () => P.siren)
-
-      // Feedback
-      .blend(src(o0), () => P.trail);
-
-  comp.out(o0);
   render(o0);
 
   // ===== MIDI: ALLE Parameter per CC steuerbar (ohne rebuild) =====
@@ -194,30 +162,15 @@
     ref[last] = val;
   }
 
-  // --- helpers for MIDI mapping ---
-  function mapLinear(d2, [outMin, outMax]) { const t = d2 / 127; return outMin + t * (outMax - outMin); }
-  function mapBipolar(d2, [negMin, posMax], dead = 2) {
-    const center = 63.5; if (Math.abs(d2 - center) <= dead) return 0;
-    if (d2 > center) { const lo = center + dead; const t = (d2 - lo) / (127 - lo); return t * posMax; }
-    const hi = center - dead; const t = (d2 - hi) / (0 - hi); return t * negMin;
-  }
-  function mapInt(d2, [minI, maxI]) { const t = d2 / 127; return Math.round(minI + t * (maxI - minI)); }
-
   // CC → Parameterpfad + Typ/Range
   const CC_MAP = {
     // Mix/Global
     1:  { path:'blend',   type:'lin', range:[0,1] },
-    2:  { path:'trail',   type:'lin', range:[0.0,0.99] },
-
-    // Keying
-    // 5:  { path:'key_on',  type:'toggle', A:0, B:1 },
-    // 6:  { path:'key_thr', type:'lin',    range:[0.0,0.3] },
-    // 7:  { path:'key_soft',type:'lin',    range:[0.0,0.2] },
-    // 8:  { path:'key_mode',type:'toggle', A:'add', B:'alpha' },
+    2:  { path:'trail',   type:'lin', range:[0.0,0.9] },
 
     // Sirene
-    10: { path:'siren',   type:'lin', range:[0,1],},
-    11: { path:'sir_spd', type:'bip', range:[4,-4], dead:2 },
+    10: { path:'siren',   type:'lin', range:[0,1] },
+    11: { path:'sir_spd', type:'bip', range:[-2,2], dead:2 },
     12: { path:'sir_w',   type:'lin', range:[0.05,0.9] },
     13: { path:'sir_dir', type:'toggle', A:'x', B:'y' },
     14: { path:'sirA.0',  type:'lin', range:[0,1] },
@@ -227,64 +180,86 @@
     18: { path:'sirB.1',  type:'lin', range:[0,1] },
     19: { path:'sirB.2',  type:'lin', range:[0,1] },
 
-    // BILDQUELLE
-    20: { path:'img_scl.src', type:'int', range:[0,7] },
-    21: { path:'img_scl.fac', type:'bip', range:[-1,1], dead:2 },
-    22: { path:'img_scl.att', type:'lin', range:[0.005,0.2] },
-    23: { path:'img_scl.rel', type:'lin', range:[0.05,1.0] },
-    24: { path:'img_scl.abs', type:'bip', range:[-1,1], dead:2 },
-
-    30: { path:'img_mov.src', type:'int', range:[0,7] },
-    31: { path:'img_mov.fac', type:'lin', range:[0,0.02] },
-    32: { path:'img_mov.att', type:'lin', range:[0.005,0.2] },
-    33: { path:'img_mov.rel', type:'lin', range:[0.05,1.0] },
-    34: { path:'img_mov.dir.0', type:'bip', range:[-1,1], dead:2 },
-    35: { path:'img_mov.dir.1', type:'bip', range:[-1,1], dead:2 },
-    36: { path:'img_speed',     type:'bip', range:[-0.2,0.2], dead:2 },
-
-    40: { path:'img_col.src', type:'int', range:[0,7] },
-    41: { path:'img_col.fac', type:'lin', range:[0,2.0] },
-    42: { path:'img_col.att', type:'lin', range:[0.005,0.2] },
-    43: { path:'img_col.rel', type:'lin', range:[0.05,1.0] },
-    44: { path:'img_col.h',   type:'bip', range:[-0.5,0.5], dead:2 },
-    45: { path:'img_col.s',   type:'lin', range:[0,2.0] },
-    46: { path:'img_col.v',   type:'lin', range:[0,1.0] },
-    47: { path:'img_col.ho',  type:'bip', range:[-1.0,1.0], dead:2 },
-    48: { path:'img_col.so',  type:'bip', range:[-1.0,1.0], dead:2 },
-    49: { path:'img_col.vo',  type:'bip', range:[-1.0,1.0], dead:2 },
-
-    50: { path:'img_warp',    type:'lin', range:[0,1.0] },
-    51: { path:'img_wspd',    type:'lin', range:[0.01,1.0] },
-
     // VIDEOQUELLE
-    60: { path:'vid_scl.src', type:'int', range:[0,7] },
-    61: { path:'vid_scl.fac', type:'bip', range:[-1,1], dead:2 },
-    62: { path:'vid_scl.att', type:'lin', range:[0.005,0.2] },
-    63: { path:'vid_scl.rel', type:'lin', range:[0.05,1.0] },
-    64: { path:'vid_scl.abs', type:'bip', range:[-1,1], dead:2 },
+    20: { path:'vid_scl.src', type:'int', range:[0,7] },
+    21: { path:'vid_scl.fac', type:'bip', range:[-1,1], dead:2 },
+    22: { path:'vid_scl.att', type:'lin', range:[0.005,0.2] },
+    23: { path:'vid_scl.rel', type:'lin', range:[0.05,1.0] },
+    24: { path:'vid_scl.abs', type:'lin', range:[0.05,1.5] },
 
-    70: { path:'vid_mov.src', type:'int', range:[0,7] },
-    71: { path:'vid_mov.fac', type:'lin', range:[0,0.02] },
-    72: { path:'vid_mov.att', type:'lin', range:[0.005,0.2] },
-    73: { path:'vid_mov.rel', type:'lin', range:[0.05,1.0] },
-    74: { path:'vid_mov.dir.0', type:'bip', range:[-1,1], dead:2 },
-    75: { path:'vid_mov.dir.1', type:'bip', range:[-1,1], dead:2 },
-    76: { path:'vid_speed',     type:'bip', range:[-0.2,0.2], dead:2 },
+    30: { path:'vid_mov.src', type:'int', range:[0,7] },
+    31: { path:'vid_mov.fac', type:'lin', range:[0,0.02] },
+    32: { path:'vid_mov.att', type:'lin', range:[0.005,0.2] },
+    33: { path:'vid_mov.rel', type:'lin', range:[0.05,1.0] },
+    34: { path:'vid_mov.dir.0', type:'bip', range:[-1,1], dead:2 },
+    35: { path:'vid_mov.dir.1', type:'bip', range:[-1,1], dead:2 },
+    36: { path:'vid_speed',     type:'bip', range:[-0.2,0.2], dead:2 },
 
-    80: { path:'vid_col.src', type:'int', range:[0,7] },
-    81: { path:'vid_col.fac', type:'lin', range:[0,2.0] },
-    82: { path:'vid_col.att', type:'lin', range:[0.005,0.2] },
-    83: { path:'vid_col.rel', type:'lin', range:[0.05,1.0] },
-    84: { path:'vid_col.h',   type:'bip', range:[-0.5,0.5], dead:2 },
-    85: { path:'vid_col.s',   type:'lin', range:[0,1.0] },
-    86: { path:'vid_col.v',   type:'lin', range:[0,1.0] },
-    87: { path:'vid_col.ho',  type:'bip', range:[-1.0,1.0], dead:2 },
-    88: { path:'vid_col.so',  type:'bip', range:[-1.0,1.0], dead:2 },
-    89: { path:'vid_col.vo',  type:'bip', range:[-1.0,1.0], dead:2 },
+    40: { path:'vid_col.src', type:'int', range:[0,7] },
+    41: { path:'vid_col.fac', type:'lin', range:[0,2.0] },
+    42: { path:'vid_col.att', type:'lin', range:[0.005,0.2] },
+    43: { path:'vid_col.rel', type:'lin', range:[0.05,1.0] },
+    44: { path:'vid_col.h',   type:'bip', range:[-0.5,0.5], dead:2 },
+    45: { path:'vid_col.s',   type:'lin', range:[0,1.0] },
+    46: { path:'vid_col.v',   type:'lin', range:[0,1.0] },
+    47: { path:'vid_col.ho',  type:'bip', range:[-1.0,1.0], dead:2 },
+    48: { path:'vid_col.so',  type:'bip', range:[-1.0,1.0], dead:2 },
+    49: { path:'vid_col.vo',  type:'bip', range:[-1.0,1.0], dead:2 },
 
-    90: { path:'vid_warp',    type:'lin', range:[0,1.0] },
-    91: { path:'vid_wspd',    type:'lin', range:[0.01,1.0] },
+
+    50: { path:'vid_warp',    type:'lin', range:[0,1.0] },
+    51: { path:'vid_wspd',    type:'lin', range:[0.01,1.0] },
+
+    // BILDQUELLE
+    60: { path:'img_scl.src', type:'int', range:[0,7] },
+    61: { path:'img_scl.fac', type:'bip', range:[-1,1], dead:2 },
+    62: { path:'img_scl.att', type:'lin', range:[0.005,0.2] },
+    63: { path:'img_scl.rel', type:'lin', range:[0.05,1.0] },
+    64: { path:'img_scl.abs', type:'lin', range:[0.05,2.0] },
+
+    70: { path:'img_mov.src', type:'int', range:[0,7] },
+    71: { path:'img_mov.fac', type:'lin', range:[0,0.02] },
+    72: { path:'img_mov.att', type:'lin', range:[0.005,0.2] },
+    73: { path:'img_mov.rel', type:'lin', range:[0.05,1.0] },
+    74: { path:'img_mov.dir.0', type:'bip', range:[-1,1], dead:2 },
+    75: { path:'img_mov.dir.1', type:'bip', range:[-1,1], dead:2 },
+    76: { path:'img_speed',     type:'bip', range:[-0.2,0.2], dead:2 },
+
+    80: { path:'img_col.src', type:'int', range:[0,7] },
+    81: { path:'img_col.fac', type:'lin', range:[0,2.0] },
+    82: { path:'img_col.att', type:'lin', range:[0.005,0.2] },
+    83: { path:'img_col.rel', type:'lin', range:[0.05,1.0] },
+    84: { path:'img_col.h',   type:'bip', range:[-0.5,0.5], dead:2 },
+    85: { path:'img_col.s',   type:'lin', range:[0,1.0] },
+    86: { path:'img_col.v',   type:'lin', range:[0,1.0] },
+    87: { path:'img_col.ho',  type:'bip', range:[-1.0,1.0], dead:2 },
+    88: { path:'img_col.so',  type:'bip', range:[-1.0,1.0], dead:2 },
+    89: { path:'img_col.vo',  type:'bip', range:[-1.0,1.0], dead:2 },
+
+    90: { path:'img_warp',    type:'lin', range:[0,1.0] },
+    91: { path:'img_wspd',    type:'lin', range:[0.01,1.0] }
   };
+
+  // --- helpers for MIDI mapping ---
+  function mapLinear(d2, [outMin, outMax]) {
+    const t = d2 / 127; return outMin + t * (outMax - outMin);
+  }
+  function mapBipolar(d2, [negMin, posMax], dead = 2) {
+    const center = 63.5;
+    if (Math.abs(d2 - center) <= dead) return 0;
+    if (d2 > center) {
+      const lo = center + dead;
+      const t = (d2 - lo) / (127 - lo);
+      return t * posMax;
+    } else {
+      const hi = center - dead;
+      const t = (d2 - hi) / (0 - hi);
+      return t * negMin; // negMin < 0
+    }
+  }
+  function mapInt(d2, [minI, maxI]) {
+    const t = d2 / 127; return Math.round(minI + t * (maxI - minI));
+  }
 
   async function initMIDI_AllParams(){
     if (!('requestMIDIAccess' in navigator)) {
@@ -301,16 +276,12 @@
 
         let newVal;
         if (map.type === 'toggle') newVal = (d2 < 64) ? map.A : map.B;
-        else if (map.type === 'int') { const t=d2/127; newVal = Math.round(map.range[0] + t*(map.range[1]-map.range[0])); }
-        else if (map.type === 'bip') {
-          const center=63.5, dead=map.dead ?? 2;
-          if (Math.abs(d2-center) <= dead) newVal = 0;
-          else if (d2>center){ const lo=center+dead; const t=(d2-lo)/(127-lo); newVal=t*map.range[1]; }
-          else { const hi=center-dead; const t=(d2-hi)/(0-hi); newVal=t*map.range[0]; }
-        } else { const t=d2/127; newVal = map.range[0] + t*(map.range[1]-map.range[0]); }
+        else if (map.type === 'int') newVal = mapInt(d2, map.range);
+        else if (map.type === 'bip') newVal = mapBipolar(d2, map.range, map.dead ?? 2);
+        else newVal = mapLinear(d2, map.range);
 
         setByPath(P, map.path, newVal);
-        // kein rebuild – Graph liest P pro Frame
+        // kein build(); der Graph liest P pro Frame
       };
     });
 
@@ -320,7 +291,9 @@
   }
   await initMIDI_AllParams();
 
-  // Deprecation-Warnung von hydra-synth/Meyda ist unkritisch.
+  // Hinweis zu der Deprecation-Warnung:
+  // "ScriptProcessorNode is deprecated" kommt aus hydra-synth/Meyda und ist unkritisch.
+  // Sie betrifft nur die DevTools-Warnungen, nicht die Funktionalität.
 
 </script>
 </body>
