@@ -47,6 +47,7 @@
     try { await vidEl.play(); } catch(e){ console.warn("play() warn:", e); }
     if (!setCamera._init) {
       s1.init({ src: vidEl, dynamic:true }); // nur 1× initialisieren
+      //s1.initVideo("./greatchasem8.mkv"); // lokal
       setCamera._init = true;
     }
   }
@@ -73,14 +74,22 @@
     sirA:[1.0,0.05,0.05], sirB:[0.05,0.2,1.0],
 
     // Mix
-    blend:1, trail:0.22,
-
-    // Keying (Video: Schwarz = transparent) //To Do
-    // key_on: 0,              // 0 = normales Crossfade, 1 = Key aktiv
-    // key_thr: 0.05,          // Luma-Threshold
-    // key_soft: 0.04,         // Kantenweichheit
-    // key_mode: 'alpha'         // 'add' oder 'alpha'
+    blend:1, trail:0.22
   };
+
+  // -------- Scroll-Startanker (neu) --------
+  // Startzeitpunkte, ab denen das "integrierte" Scrollen beginnt
+  let imgSpeedStart = 0;
+  let prevImgSpeed = P.img_speed;
+
+  // (optional auch für Video, falls du das gleiche Verhalten dort willst)
+  let vidSpeedStart = 0;
+  let prevVidSpeed = P.vid_speed;
+
+  // liefert den Basis-Scroll aus der statischen Geschwindigkeit,
+  // startet bei 0 genau beim Moment des Aktivierens
+  const baseImgScroll = () => (P.img_speed !== 0 ? (time - imgSpeedStart) * P.img_speed : 0);
+  const baseVidScroll = () => (P.vid_speed !== 0 ? (time - vidSpeedStart) * P.vid_speed : 0);
 
   // -------- Dynamische Envelopes (lesen P live, kein Rebuild nötig) --------
   function makeDynEnv(getSrc, getAtt, getRel, getFac){
@@ -129,8 +138,8 @@
 
   // -------- Node-Graph EINMAL definieren --------
   const imgNode = () => src(s0).scale(1,1)
-    .scrollX(() => time*P.img_speed + time*P.img_mov.dir[0]*iM())
-    .scrollY(() => time*P.img_mov.dir[1]*iM())
+    .scrollX(() => baseImgScroll() + time*P.img_mov.dir[0]*iM())  // <— geändert
+    .scrollY(() =>              time*P.img_mov.dir[1]*iM())
     .scale(() => P.img_scl.abs + 1 + iS())
     .modulate(noiseI(), () => P.img_warp * 0.05)
     .hue(() => P.img_col.ho + P.img_col.h * iC())
@@ -138,48 +147,21 @@
     .brightness(() => P.img_col.vo + P.img_col.v * iC());
 
   const camNode = () => src(s1)
-    .scrollX(() => time*P.vid_mov.dir[0]*vM() + time*P.vid_speed)
-    .scrollY(() => time*P.vid_mov.dir[1]*vM())
+    .scrollX(() => baseVidScroll() + time*P.vid_mov.dir[0]*vM())  // <— optional gleiches Verhalten fürs Video
+    .scrollY(() =>              time*P.vid_mov.dir[1]*vM())
     .scale(() => P.vid_scl.abs + 1 + vS())
     .modulate(noiseV(), () => P.vid_warp * 0.05)
     .hue(() => P.vid_col.ho + P.vid_col.h * vC())
     .saturate(() => P.vid_col.so + P.vid_col.s * vC())
     .brightness(() => P.vid_col.vo + P.vid_col.v * vC());
 
-  // ---- Keying auf das bereits bearbeitete Video anwenden ----
-  //const camLuma = () => camNode().saturate(0).thresh(() => P.key_thr, () => P.key_soft);
-  //const camKeyed = () => camNode().mask(camLuma());
-
   // Erstes Frame „schwarz“ in o0, damit Feedback sauber startet
   solid(0,0,0,1).out(o0);
 
-  // -------- Komposition --------
-  // 1) Normales Crossfade (wenn key_on = 0)
-  // 2) Keyed Video darüber (Add oder Alpha), wenn key_on = 1
   const comp =
     imgNode()
-      // Normal-Blend aktiv im Verhältnis blend * (1 - key_on)
-      //.blend(camNode(), () => P.blend * (1 - P.key_on))
-      .add(camNode(), () => P.blend)
-      // Key-Zweig: Add ODER Alpha – gewichtet mit blend * key_on
-      // .add( // ADD-Modus-Anteil
-      //  camKeyed(),
-      //  () => P.key_mode === 'add' ? P.blend * P.key_on : 0
-      // )
-      // .layer( // ALPHA-Modus-Anteil (Deckkraft via mult)
-      //   camKeyed().mult(
-      //     solid(
-      //       () => P.key_mode === 'alpha' ? P.blend * P.key_on : 0,
-      //       () => P.key_mode === 'alpha' ? P.blend * P.key_on : 0,
-      //       () => P.key_mode === 'alpha' ? P.blend * P.key_on : 0
-      //     )
-      //   )
-      // )
-
-      // Sirene
+      .add(camNode(), () => P.blend)   // (du nutzt derzeit Add statt Blend)
       .add(sirenTex(), () => P.siren)
-
-      // Feedback
       .blend(src(o0), () => P.trail);
 
   comp.out(o0);
@@ -203,29 +185,29 @@
   }
   function mapInt(d2, [minI, maxI]) { const t = d2 / 127; return Math.round(minI + t * (maxI - minI)); }
 
-  // CC → Parameterpfad + Typ/Range
+  // CC → Parameterpfad + Typ/Range (deine Belegung beibehalten)
   const CC_MAP = {
     // Mix/Global
-    1:  { path:'blend',   type:'lin', range:[0,1] },
-    2:  { path:'trail',   type:'lin', range:[0.0,0.99] },
+    1: { path:'blend', type:'lin', range:[0,1] },
+    2: { path:'trail', type:'lin', range:[0.0,0.99] },
 
-    // Keying
-    // 5:  { path:'key_on',  type:'toggle', A:0, B:1 },
-    // 6:  { path:'key_thr', type:'lin',    range:[0.0,0.3] },
-    // 7:  { path:'key_soft',type:'lin',    range:[0.0,0.2] },
-    // 8:  { path:'key_mode',type:'toggle', A:'add', B:'alpha' },
+    // Keying //
+    5: { path:'key_on', type:'toggle', A:0, B:1 }, //
+    6: { path:'key_thr', type:'lin', range:[0.0,0.3] },
+    7: { path:'key_soft',type:'lin', range:[0.0,0.2] },
+    8: { path:'key_mode',type:'toggle', A:'add', B:'alpha' },
 
-    // Sirene
-    10: { path:'siren',   type:'lin', range:[0,1],},
+    //Sirene
+    10: { path:'siren', type:'lin', range:[0,1],},
     11: { path:'sir_spd', type:'bip', range:[4,-4], dead:2 },
-    12: { path:'sir_w',   type:'lin', range:[0.05,0.9] },
+    12: { path:'sir_w', type:'lin', range:[0.05,0.9] },
     13: { path:'sir_dir', type:'toggle', A:'x', B:'y' },
-    14: { path:'sirA.0',  type:'lin', range:[0,1] },
-    15: { path:'sirA.1',  type:'lin', range:[0,1] },
-    16: { path:'sirA.2',  type:'lin', range:[0,1] },
-    17: { path:'sirB.0',  type:'lin', range:[0,1] },
-    18: { path:'sirB.1',  type:'lin', range:[0,1] },
-    19: { path:'sirB.2',  type:'lin', range:[0,1] },
+    14: { path:'sirA.0', type:'lin', range:[0,1] },
+    15: { path:'sirA.1', type:'lin', range:[0,1] },
+    16: { path:'sirA.2', type:'lin', range:[0,1] },
+    17: { path:'sirB.0', type:'lin', range:[0,1] },
+    18: { path:'sirB.1', type:'lin', range:[0,1] },
+    19: { path:'sirB.2', type:'lin', range:[0,1] },
 
     // BILDQUELLE
     20: { path:'img_scl.src', type:'int', range:[0,7] },
@@ -233,28 +215,25 @@
     22: { path:'img_scl.att', type:'lin', range:[0.005,0.2] },
     23: { path:'img_scl.rel', type:'lin', range:[0.05,1.0] },
     24: { path:'img_scl.abs', type:'bip', range:[-1,1], dead:2 },
-
     30: { path:'img_mov.src', type:'int', range:[0,7] },
     31: { path:'img_mov.fac', type:'lin', range:[0,0.02] },
     32: { path:'img_mov.att', type:'lin', range:[0.005,0.2] },
     33: { path:'img_mov.rel', type:'lin', range:[0.05,1.0] },
     34: { path:'img_mov.dir.0', type:'bip', range:[-1,1], dead:2 },
     35: { path:'img_mov.dir.1', type:'bip', range:[-1,1], dead:2 },
-    36: { path:'img_speed',     type:'bip', range:[-0.2,0.2], dead:2 },
-
+    36: { path:'img_speed', type:'bip', range:[-0.2,0.2], dead:2 },
     40: { path:'img_col.src', type:'int', range:[0,7] },
     41: { path:'img_col.fac', type:'lin', range:[0,2.0] },
     42: { path:'img_col.att', type:'lin', range:[0.005,0.2] },
     43: { path:'img_col.rel', type:'lin', range:[0.05,1.0] },
-    44: { path:'img_col.h',   type:'bip', range:[-0.5,0.5], dead:2 },
-    45: { path:'img_col.s',   type:'lin', range:[0,2.0] },
-    46: { path:'img_col.v',   type:'lin', range:[0,1.0] },
-    47: { path:'img_col.ho',  type:'bip', range:[-1.0,1.0], dead:2 },
-    48: { path:'img_col.so',  type:'bip', range:[-1.0,1.0], dead:2 },
-    49: { path:'img_col.vo',  type:'bip', range:[-1.0,1.0], dead:2 },
-
-    50: { path:'img_warp',    type:'lin', range:[0,1.0] },
-    51: { path:'img_wspd',    type:'lin', range:[0.01,1.0] },
+    44: { path:'img_col.h', type:'bip', range:[-0.5,0.5], dead:2 },
+    45: { path:'img_col.s', type:'lin', range:[0,2.0] },
+    46: { path:'img_col.v', type:'lin', range:[0,1.0] },
+    47: { path:'img_col.ho', type:'bip', range:[-1.0,1.0], dead:2 },
+    48: { path:'img_col.so', type:'bip', range:[-1.0,1.0], dead:2 },
+    49: { path:'img_col.vo', type:'bip', range:[-1.0,1.0], dead:2 },
+    50: { path:'img_warp', type:'lin', range:[0,1.0] },
+    51: { path:'img_wspd', type:'lin', range:[0.01,1.0] },
 
     // VIDEOQUELLE
     60: { path:'vid_scl.src', type:'int', range:[0,7] },
@@ -262,28 +241,25 @@
     62: { path:'vid_scl.att', type:'lin', range:[0.005,0.2] },
     63: { path:'vid_scl.rel', type:'lin', range:[0.05,1.0] },
     64: { path:'vid_scl.abs', type:'bip', range:[-1,1], dead:2 },
-
     70: { path:'vid_mov.src', type:'int', range:[0,7] },
     71: { path:'vid_mov.fac', type:'lin', range:[0,0.02] },
     72: { path:'vid_mov.att', type:'lin', range:[0.005,0.2] },
     73: { path:'vid_mov.rel', type:'lin', range:[0.05,1.0] },
     74: { path:'vid_mov.dir.0', type:'bip', range:[-1,1], dead:2 },
     75: { path:'vid_mov.dir.1', type:'bip', range:[-1,1], dead:2 },
-    76: { path:'vid_speed',     type:'bip', range:[-0.2,0.2], dead:2 },
-
+    76: { path:'vid_speed', type:'bip', range:[-0.2,0.2], dead:2 },
     80: { path:'vid_col.src', type:'int', range:[0,7] },
     81: { path:'vid_col.fac', type:'lin', range:[0,2.0] },
     82: { path:'vid_col.att', type:'lin', range:[0.005,0.2] },
     83: { path:'vid_col.rel', type:'lin', range:[0.05,1.0] },
-    84: { path:'vid_col.h',   type:'bip', range:[-0.5,0.5], dead:2 },
-    85: { path:'vid_col.s',   type:'lin', range:[0,1.0] },
-    86: { path:'vid_col.v',   type:'lin', range:[0,1.0] },
-    87: { path:'vid_col.ho',  type:'bip', range:[-1.0,1.0], dead:2 },
-    88: { path:'vid_col.so',  type:'bip', range:[-1.0,1.0], dead:2 },
-    89: { path:'vid_col.vo',  type:'bip', range:[-1.0,1.0], dead:2 },
-
-    90: { path:'vid_warp',    type:'lin', range:[0,1.0] },
-    91: { path:'vid_wspd',    type:'lin', range:[0.01,1.0] },
+    84: { path:'vid_col.h', type:'bip', range:[-0.5,0.5], dead:2 },
+    85: { path:'vid_col.s', type:'lin', range:[0,1.0] },
+    86: { path:'vid_col.v', type:'lin', range:[0,1.0] },
+    87: { path:'vid_col.ho', type:'bip', range:[-1.0,1.0], dead:2 },
+    88: { path:'vid_col.so', type:'bip', range:[-1.0,1.0], dead:2 },
+    89: { path:'vid_col.vo', type:'bip', range:[-1.0,1.0], dead:2 },
+    90: { path:'vid_warp', type:'lin', range:[0,1.0] },
+    91: { path:'vid_wspd', type:'lin', range:[0.01,1.0] },
   };
 
   async function initMIDI_AllParams(){
@@ -299,6 +275,7 @@
         const map = CC_MAP[d1];
         if (!map) return;
 
+        // Wert mappen
         let newVal;
         if (map.type === 'toggle') newVal = (d2 < 64) ? map.A : map.B;
         else if (map.type === 'int') { const t=d2/127; newVal = Math.round(map.range[0] + t*(map.range[1]-map.range[0])); }
@@ -309,8 +286,22 @@
           else { const hi=center-dead; const t=(d2-hi)/(0-hi); newVal=t*map.range[0]; }
         } else { const t=d2/127; newVal = map.range[0] + t*(map.range[1]-map.range[0]); }
 
+        // Setzen
         setByPath(P, map.path, newVal);
-        // kein rebuild – Graph liest P pro Frame
+
+        // --- NEU: Speed-Startanker pflegen ---
+        if (map.path === 'img_speed') {
+          // 0 → ≠0: Startzeit auf "jetzt" setzen, damit Scroll bei 0 beginnt
+          if (prevImgSpeed === 0 && newVal !== 0) imgSpeedStart = time;
+          // optional: bei Rückkehr auf 0 neu „armen“
+          if (newVal === 0) imgSpeedStart = time;
+          prevImgSpeed = newVal;
+        }
+        if (map.path === 'vid_speed') {
+          if (prevVidSpeed === 0 && newVal !== 0) vidSpeedStart = time;
+          if (newVal === 0) vidSpeedStart = time;
+          prevVidSpeed = newVal;
+        }
       };
     });
 
